@@ -366,6 +366,8 @@ void HEAP_STACK_MEMORY_PRINT(char* FUNCTION_NAME);
 #include "LCD_DISPLAY.h"
 #include "buzzer.h"
 
+
+
 #define NVS_NAMESPACE "attendance"
 #define NVS_KEY_USERS "users"
 #define NVS_KEY_ATTENDANCE "attendance"
@@ -379,6 +381,7 @@ typedef struct {
     bool nvs_ready;
     bool wifi_ready;
     bool lcd_ready;
+    bool IDLE_DISPLAY_PRINT;
     bool buzzer_ready;
     bool database_ready;
     bool fingerprint_ready;
@@ -410,7 +413,14 @@ uint16_t CURRENT_R305_TEMPLATE_COUNT =0;
 
 esp_err_t api_fingerprint_enroll_handler(httpd_req_t *req);
 esp_err_t api_rfid_enroll_handler(httpd_req_t *req) ;
+esp_err_t api_fingerprint_clear_database_handler(httpd_req_t *req);
+esp_err_t fingerprint_delete_template_id(uint16_t template_id); 
 
+
+
+esp_err_t api_reset_clear_database_handler(httpd_req_t *req);
+esp_err_t api_clear_attendance_handler(httpd_req_t *req);
+   
 
 
 
@@ -5530,24 +5540,46 @@ static const httpd_uri_t uri_api_fingerprint_enroll = {
     .handler = api_fingerprint_enroll_handler
 };
 
+static const httpd_uri_t uri_api_fingerprint_clear_database = {
+    .uri = "/api/fingerprint/clear_database",
+    .method = HTTP_GET,
+    .handler = api_fingerprint_clear_database_handler
+};
+
 static const httpd_uri_t uri_api_rfid_enroll = {
     .uri = "/api/rfid/register",
     .method = HTTP_POST,
     .handler = api_rfid_enroll_handler
 };
-         httpd_register_uri_handler(server, &uri_api_fingerprint_enroll);
-         httpd_register_uri_handler(server, &uri_api_rfid_enroll);
-    
-   
 
+static const httpd_uri_t uri_api_reset_clear_database = {
+    .uri = "/api/system/reset",
+    .method = HTTP_GET,
+    .handler = api_reset_clear_database_handler
+};
+
+static const httpd_uri_t uri_api_clear_attendance = {
+    .uri = "/api/database/clear-attendance",
+    .method = HTTP_GET,
+    .handler = api_clear_attendance_handler
+};
+
+         httpd_register_uri_handler(server, &uri_api_fingerprint_clear_database);
+         httpd_register_uri_handler(server, &uri_api_fingerprint_enroll);
+         
+         
+         httpd_register_uri_handler(server, &uri_api_rfid_enroll);
+         
+         httpd_register_uri_handler(server, &uri_api_reset_clear_database);
+         httpd_register_uri_handler(server, &uri_api_clear_attendance);
+    
         httpd_register_uri_handler(server, &uri_api_system_data);
         httpd_register_uri_handler(server, &uri_api_user_add);
         httpd_register_uri_handler(server, &uri_api_user_update);
         httpd_register_uri_handler(server, &uri_api_user_delete);
         httpd_register_uri_handler(server, &uri_api_session_start);
         httpd_register_uri_handler(server, &uri_api_session_stop);
-    
-   
+        
     
  }else{
          ESP_LOGE("HTTP SERVER", "Failed to start server");
@@ -6901,13 +6933,25 @@ void lcd_show_error(const char *message) {
     lcd_write(line);
 }
 
+void lcd_show_message(const char *message) {
+    clear_lcd();
+    vTaskDelay(pdMS_TO_TICKS(10));
+    lcd_set_cursor(0, 0);
+    lcd_write("   NOTIFY  ");
+    lcd_set_cursor(1, 0);
+    
+    char line[17];
+    snprintf(line, sizeof(line), "%.15s", message);
+    lcd_write(line);
+}
+
 void lcd_show_enrollment(const char *name, int step) {
     clear_lcd();
     vTaskDelay(pdMS_TO_TICKS(10));
     lcd_set_cursor(0, 0);
     
     char line1[17];
-    snprintf(line1, sizeof(line1), "Enroll: %.8s", name);
+    snprintf(line1, sizeof(line1), "ENROLL: %.8s", name);
     lcd_write(line1);
     
     lcd_set_cursor(1, 0);
@@ -7216,6 +7260,7 @@ static esp_err_t parse_attendance_from_json(const char *json_str) {
 /* ==================== NVS LOAD/SAVE FUNCTIONS ==================== */
 
 esp_err_t attendance_load_from_nvs(void) {
+    
     ESP_LOGI(TAG, "Loading attendance data from NVS...");
     
     esp_err_t err;
@@ -7247,6 +7292,10 @@ esp_err_t attendance_load_from_nvs(void) {
     err = READ_JSON_BODY_FROM_NVS(NVS_NAMESPACE, "stats_len", NVS_KEY_STATS, &json_content, NULL);
     if (err == ESP_OK && json_content) {
         cJSON *root = cJSON_Parse(json_content);
+    
+     system_stats.total_faculty  = 0;
+     system_stats.total_students = 0;
+     system_stats.total_users    = 0;
         if (root) {
             cJSON *item;
             item = cJSON_GetObjectItem(root, "total_users");
@@ -7322,30 +7371,10 @@ esp_err_t attendance_save_to_nvs(void) {
     return ESP_OK;
 }
 
-/* ==================== INITIALIZATION ==================== */
-
-esp_err_t attendance_system_init(void) {
-    ESP_LOGI(TAG, "Initializing Attendance System...");
-    
-    // Clear arrays
-    memset(user_database, 0, sizeof(user_database));
-    memset(attendance_records, 0, sizeof(attendance_records));
-    memset(session_history, 0, sizeof(session_history));
-    memset(&current_session, 0, sizeof(current_session));
-    memset(&system_stats, 0, sizeof(system_stats));
-    
-    // Load data from NVS
-    attendance_load_from_nvs();
-    
-   // system_initialized = true;
-    ESP_LOGI(TAG, "Attendance System initialized");
-    ESP_LOGI(TAG, "Memory usage: Users=%u bytes, Attendance=%u bytes", sizeof(user_database), sizeof(attendance_records));
-    
-    return ESP_OK;
-}
 
 
-static int find_user_index_by_id(uint16_t user_id) {
+static int find_user_index_by_id(uint16_t user_id){
+  
     for (int i = 0; i < total_users; i++) {
         if (user_database[i].user_id == user_id) {
             return i;
@@ -7354,17 +7383,19 @@ static int find_user_index_by_id(uint16_t user_id) {
     return -1;
 }
 
-user_record_t* attendance_find_by_fingerprint(uint8_t fingerprint_id) {
+int attendance_find_by_fingerprint(uint8_t fingerprint_id){
+   
     for (int i = 0; i < total_users; i++) {
         if (user_database[i].fingerprint_enrolled && 
             user_database[i].fingerprint_id == fingerprint_id) {
-            return &user_database[i];
+            return i;
         }
     }
-    return NULL;
+    return -1;
 }
 
-user_record_t* attendance_find_by_rfid(const uint8_t *uid, uint8_t uid_len) {
+user_record_t* attendance_find_by_rfid(const uint8_t *uid, uint8_t uid_len){
+  
     for (int i = 0; i < total_users; i++) {
         if (user_database[i].rfid_enrolled &&
             user_database[i].rfid_uid_len == uid_len &&
@@ -7408,28 +7439,108 @@ const char* attendance_status_to_string(attendance_status_t status) {
     }
 }
 
-/*
-esp_err_t nvs_delete_key(const char *key) {
-    nvs_handle_t handle;
-    esp_err_t err;
-    
-    err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
-    if (err != ESP_OK) return err;
-    
-    err = nvs_erase_key(handle, key);
-    nvs_commit(handle);
-    nvs_close(handle);
-    
-    return err;
-}*/
 
-int16_t add_user(user_record_t *user) {
+attendance_status_t attendance_mark(uint16_t user_id, attendance_status_t status, auth_method_t method){
+  
+  
+/*  typedef enum {
+    ATTENDANCE_PRESENT = 0,
+    ATTENDANCE_ABSENT =  1,
+    ATTENDANCE_LATE =    2,
+    ATTENDANCE_LEAVE =    3,
+    USER_NOT_FOUND,
+    ATTENDANCE_DONE,
+    ATTENDANCE_FAILED,
+    SESSION_INACTIVE,
+    SESSION_ACTIVE,
+    ALREAY_MARKED,
+    MEMORY_FULL,
+    SYSTEM_ERROR
    
-    if (total_users >= MAX_USERS) {
+} attendance_status_t;*/
+  
+    if (!current_session.active){
+        ESP_LOGW("attendance_mark", "No active session");
+        return SESSION_INACTIVE;
+    }
+    
+    if(total_records >= MAX_ATTENDANCE_RECORDS){
+        ESP_LOGE("attendance_mark", "Attendance records full!");
+        return MEMORY_FULL;
+    }
+    
+    int user_idx = find_user_index_by_id(user_id);
+    if(user_idx < 0){
+        ESP_LOGE("attendance_mark", "User not found");
+        return USER_NOT_FOUND;
+    }
+    
+    
+    // Check if already marked
+    for (uint32_t i = 0; i < total_records; i++){
+        if (attendance_records[i].user_id == user_id && strcmp(attendance_records[i].session_id, current_session.session_id) == 0) {
+            ESP_LOGW("attendance_mark", "*****User already marked attendance in this session*******");
+            return ALREAY_MARKED;
+        }
+    }
+    
+    // Create record
+    attendance_records[total_records].record_id = total_records + 200;
+    attendance_records[total_records].user_id = user_id;
+    attendance_records[total_records].timestamp = time(NULL);
+    attendance_records[total_records].status = status;
+    attendance_records[total_records].auth_method = method;
+    strncpy(attendance_records[total_records].session_id, current_session.session_id, MAX_SESSION_ID_LEN - 1);
+    
+    total_records++;
+    
+    
+    // Update user stats
+        user_database[user_idx].total_classes++;
+    if (status == ATTENDANCE_PRESENT || status == ATTENDANCE_LATE){
+        user_database[user_idx].total_attendance++;
+        current_session.total_present++;
+    }
+    
+    user_database[user_idx].last_seen = time(NULL);
+    
+    // Update system stats
+    system_stats.today_attendance_count++;
+    system_stats.successful_scans++;
+    system_stats.last_updated = time(NULL);
+    
+    // Save to NVS (async save recommended in production)
+    attendance_save_to_nvs();
+    
+    ESP_LOGI("attendance_mark", "Attendance marked: User %d, Status %d, Method %d", user_id, status, method);
+    return ATTENDANCE_DONE;
+}
+
+ 
+    
+int16_t add_user(user_record_t *user){
+   
+     ESP_LOGE(TAG, "add_user current total_users %d",total_users); 
+    
+    if (total_users >= MAX_USERS){
         ESP_LOGE(TAG, "User database full!");
         return -1;
     }
-      ESP_LOGE(TAG, "add_user current total_users %d",total_users);
+    
+     int user_idx = -2;
+    for (int i = 0; i < total_users; i++){
+        if (strcmp(user_database[i].roll_number, user->roll_number) == 0 || strcmp(user_database[i].email, user->email) == 0 ){
+            user_idx = i;
+            break;
+        }
+    }
+    
+    if (user_idx >= 0){
+		ESP_LOGE(TAG, "NEW User added: Name=%s  id : %s  email : %s EMAIL OR ID EXITS", user->name, user->roll_number,user->email);
+        return -2;
+    }
+    
+    
     user->user_id = total_users + 100;
     user->created_at = time(NULL);
     user->total_attendance = 0;
@@ -7438,9 +7549,9 @@ int16_t add_user(user_record_t *user) {
     user->fingerprint_enrolled = false,
     user->rfid_enrolled = false,
     
-    total_users++;
     memcpy(&user_database[total_users], user, sizeof(user_record_t));
-    
+    total_users++;
+  
     system_stats.total_users = total_users;
     
     if (user->type == USER_TYPE_STUDENT) {
@@ -7457,70 +7568,12 @@ int16_t add_user(user_record_t *user) {
     return user->user_id;
 }
 
-esp_err_t attendance_mark(uint16_t user_id, attendance_status_t status, auth_method_t method) {
-  
-    if (!current_session.active) {
-        ESP_LOGW(TAG, "No active session");
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    if (total_records >= MAX_ATTENDANCE_RECORDS) {
-        ESP_LOGE(TAG, "Attendance records full!");
-        return ESP_ERR_NO_MEM;
-    }
-    
-    int user_idx = find_user_index_by_id(user_id);
-    if (user_idx < 0) {
-        ESP_LOGE(TAG, "User not found");
-        return ESP_ERR_NOT_FOUND;
-    }
-    
-    // Check if already marked
-    for (uint32_t i = 0; i < total_records; i++) {
-        if (attendance_records[i].user_id == user_id &&
-            strcmp(attendance_records[i].session_id, current_session.session_id) == 0) {
-            ESP_LOGW(TAG, "User already marked attendance in this session");
-            return ESP_ERR_INVALID_STATE;
-        }
-    }
-    
-    // Create record
-    attendance_records[total_records].record_id = total_records;
-    attendance_records[total_records].user_id = user_id;
-    attendance_records[total_records].timestamp = time(NULL);
-    attendance_records[total_records].status = status;
-    attendance_records[total_records].auth_method = method;
-    strncpy(attendance_records[total_records].session_id, current_session.session_id, MAX_SESSION_ID_LEN - 1);
-    
-    total_records++;
-    
-    // Update user stats
-    user_database[user_idx].total_classes++;
-    if (status == ATTENDANCE_PRESENT || status == ATTENDANCE_LATE) {
-        user_database[user_idx].total_attendance++;
-        current_session.total_present++;
-    }
-    user_database[user_idx].last_seen = time(NULL);
-    
-    // Update system stats
-    system_stats.today_attendance_count++;
-    system_stats.successful_scans++;
-    system_stats.last_updated = time(NULL);
-    
-    // Save to NVS (async save recommended in production)
-    attendance_save_to_nvs();
-    
-    ESP_LOGI(TAG, "Attendance marked: User %d, Status %d, Method %d", user_id, status, method);
-    return ESP_OK;
-}
-
-
-
 /**
  * @brief GET /api/system/data - Return all system data
  */
  
- esp_err_t  api_system_data_handler(httpd_req_t *req) {
+ esp_err_t  api_system_data_handler(httpd_req_t *req){
+	 
     ESP_LOGI(TAG, "GET /api/system/data");
     
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -7540,6 +7593,7 @@ esp_err_t attendance_mark(uint16_t user_id, attendance_status_t status, auth_met
     // Add users array
     cJSON *users = cJSON_CreateArray();
     for (int i = 0; i < total_users; i++) {
+		
         cJSON *user = cJSON_CreateObject();
         cJSON_AddNumberToObject(user, "user_id", user_database[i].user_id);
         cJSON_AddStringToObject(user, "name", user_database[i].name);
@@ -7617,7 +7671,6 @@ esp_err_t attendance_mark(uint16_t user_id, attendance_status_t status, auth_met
 esp_err_t api_user_add_handler(httpd_req_t *req){
 	
     ESP_LOGI(TAG, "POST /api/user/add");
-    
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_type(req, "application/json");
     
@@ -7677,33 +7730,21 @@ esp_err_t api_user_add_handler(httpd_req_t *req){
 	  free(content);
 		content = NULL; }
 		
-	 int user_idx = -1;
-    for (int i = 0; i < total_users; i++) {
-        if (strcmp(user_database[i].roll_number, new_user.roll_number) == 0 || strcmp(user_database[i].email, new_user.email) == 0 ) {
-            user_idx = i;
-            break;
-        }
-    }
-    
-    if (user_idx >= 0) {
-		 ESP_LOGE(TAG, "NEW User added: Name=%s EMAIL OR ID EXITS", new_user.name);
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "User ID or Email exits");
-        return ESP_FAIL;
-    }
-		
+
 		
      cJSON *response = cJSON_CreateObject();
     
     int16_t user_id = add_user(&new_user);
-     if (user_id >=0) {
+   if (user_id >=0) {
            ESP_LOGI(TAG, "NEW User added: ID=%d, Name=%s", user_id, new_user.name);
            cJSON_AddBoolToObject(response, "success", true);
            cJSON_AddNumberToObject(response, "user_id", user_id);
-    
-        }else{ 
-			
+   }else if (user_id == -2){
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "User ID or Email exits");
+   }else{ 
 			 ESP_LOGE(TAG, "NEW User added failed Name=%s", new_user.name);
-			cJSON_AddBoolToObject(response, "failed", false);}
+			cJSON_AddBoolToObject(response, "failed", false);
+	}
 
     char *resp_str = cJSON_PrintUnformatted(response);
     cJSON_Delete(response);
@@ -7858,7 +7899,12 @@ esp_err_t api_user_delete_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
     
-    // Shift array to remove user (in-place)
+    
+    if(user_database[user_idx].fingerprint_enrolled){
+    fingerprint_delete_template_id(user_database[user_idx].fingerprint_id);
+    }
+   
+ 
     for (int i = user_idx; i < total_users - 1; i++) {
         memcpy(&user_database[i], &user_database[i + 1], sizeof(user_record_t));
     }
@@ -7968,7 +8014,8 @@ esp_err_t api_fingerprint_enroll_handler(httpd_req_t *req){
    
     // Find next available template ID
     uint16_t template_id = CURRENT_R305_TEMPLATE_COUNT  + 1;  // Simple mapping
-    
+    system_status.IDLE_DISPLAY_PRINT = false;
+  
     // Start enrollment (blocking operation)
     ESP_LOGI(TAG, "Starting fingerprint enrollment for user %d, template %d", user_id, template_id);
     
@@ -7980,7 +8027,7 @@ esp_err_t api_fingerprint_enroll_handler(httpd_req_t *req){
         attendance_save_to_nvs();
         ESP_LOGI(TAG, "Fingerprint enrolled successfully");
     } else {
-        ESP_LOGE(TAG, "Fingerprint enrollment failed: %s", r305_status_to_string(status));
+        ESP_LOGE(TAG, "Fingerprint enrollment failed reason: %s", r305_status_to_string(status));
     }
     
     // Response
@@ -7997,7 +8044,7 @@ esp_err_t api_fingerprint_enroll_handler(httpd_req_t *req){
     
     httpd_resp_sendstr(req, resp_str);
     free(resp_str);
-    
+     system_status.IDLE_DISPLAY_PRINT = true;
     return ESP_OK;
 }
 
@@ -8068,7 +8115,7 @@ esp_err_t api_rfid_enroll_handler(httpd_req_t *req) {
         free(resp_str);
         return ESP_OK;
     }
-    
+     system_status.IDLE_DISPLAY_PRINT = false;
     ESP_LOGI(TAG, "Waiting for RFID card...");
     
     // Wait for card (blocking with timeout)
@@ -8111,7 +8158,7 @@ esp_err_t api_rfid_enroll_handler(httpd_req_t *req) {
     
     httpd_resp_sendstr(req, resp_str);
     free(resp_str);
-    
+       system_status.IDLE_DISPLAY_PRINT = true;
     return ESP_OK;
 }
 
@@ -8126,9 +8173,9 @@ esp_err_t attendance_start_session(const char *subject, const char *faculty, con
     }
     
     memset(&current_session, 0, sizeof(current_session));
+ 
     current_session.active = true;
     current_session.start_time = time(NULL);
-    
     snprintf(current_session.session_id, MAX_SESSION_ID_LEN, "S%08lX", (unsigned long)current_session.start_time);
     strncpy(current_session.subject_name, subject, MAX_SUBJECT_LEN - 1);
     strncpy(current_session.faculty_name, faculty, MAX_NAME_LEN - 1);
@@ -8138,91 +8185,44 @@ esp_err_t attendance_start_session(const char *subject, const char *faculty, con
     return ESP_OK;
 }
 
-esp_err_t attendance_stop_session(void) {
-    if (!current_session.active) {
-        ESP_LOGW(TAG, "No active session");
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    current_session.active = false;
-    current_session.end_time = time(NULL);
-    
-    // Mark absent users
-    for (int i = 0; i < total_users; i++) {
-        if (user_database[i].status != USER_STATUS_ACTIVE) continue;
-        
-        // Check if user marked attendance in this session
-        bool marked = false;
-        for (uint32_t j = 0; j < total_records; j++) {
-            if (attendance_records[j].user_id == user_database[i].user_id &&
-                strcmp(attendance_records[j].session_id, current_session.session_id) == 0) {
-                marked = true;
-                break;
-            }
-        }
-        
-        if (!marked) {
-            current_session.total_absent++;
-        }
-    }
-    
-    // Save session to history
-    if (total_sessions < MAX_SESSIONS) {
-        memcpy(&session_history[total_sessions], &current_session, sizeof(session_info_t));
-        total_sessions++;
-    }
-    
-    // Save to NVS
-    char *json_str = serialize_sessions_to_json();
-    if (json_str) {
-        STORE_JSON_BODY_TO_NVS(NVS_NAMESPACE, "sessions_len", NVS_KEY_SESSIONS,
-                               strlen(json_str), json_str, NULL);
-        free(json_str);
-    }
-    
-    ESP_LOGI(TAG, "Session stopped: Present=%d, Absent=%d",
-             current_session.total_present, current_session.total_absent);
-    
-    return ESP_OK;
-}
-
 /* ==================== SESSION START HANDLER ==================== */
 
-esp_err_t api_session_start_handler(httpd_req_t *req) {
-    ESP_LOGI(TAG, "POST /api/session/start");
-    
+esp_err_t api_session_start_handler(httpd_req_t *req){
+	
+    ESP_LOGI(TAG, "POST/api/session/start");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_type(req, "application/json");
     
     char *content = NULL;
     esp_err_t err = FETCH_HTTP_POST_CONTENT(req, &content);
-    if (err != ESP_OK || !content) {
+    if (err != ESP_OK || !content){
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to read request");
         return ESP_FAIL;
-    }
+    } ESP_LOGI(TAG, "session/start content :%s",content);
     
     cJSON *root = cJSON_Parse(content);
-    if (!root) {
-        free(content);
+    if(!root){
+          if(content ){free(content);}
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_FAIL;
     }
     
-    cJSON *subject = cJSON_GetObjectItem(root, "subject_name");
-    cJSON *faculty = cJSON_GetObjectItem(root, "faculty_name");
+    cJSON *subject = cJSON_GetObjectItem(root, "subject");
+    cJSON *faculty = cJSON_GetObjectItem(root, "faculty");
     cJSON *department = cJSON_GetObjectItem(root, "department");
     
-    if (!subject || !faculty || !department) {
-        cJSON_Delete(root);
-        free(content);
+    if (!subject || !faculty || !department){
+         if(root ){ cJSON_Delete(root); }
+         if(content ){free(content);}
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing required fields");
         return ESP_FAIL;
     }
     
     err = attendance_start_session(subject->valuestring, faculty->valuestring, department->valuestring);
     
-    cJSON_Delete(root);
-    free(content);
+    
+   if(root ){ cJSON_Delete(root); }
+   if(content ){free(content);}
     
     // Response
     cJSON *response = cJSON_CreateObject();
@@ -8240,11 +8240,59 @@ esp_err_t api_session_start_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+
+esp_err_t attendance_stop_session(void){
+   
+    if (!current_session.active) {
+        ESP_LOGW(TAG, "No active session");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    current_session.active = false;
+    current_session.end_time = time(NULL);
+    
+    // Mark absent users
+    for (int i = 0; i < total_users; i++){
+		
+        if (user_database[i].status != USER_STATUS_ACTIVE) continue;
+        
+        // Check if user marked attendance in this session
+        bool marked = false;
+        for (uint32_t j = 0; j < total_records; j++){
+            if (attendance_records[j].user_id == user_database[i].user_id &&strcmp(attendance_records[j].session_id, current_session.session_id) == 0){
+                marked = true;
+                break;
+            }
+        }
+        
+        if (!marked){
+            current_session.total_absent++;
+        }
+    }
+    
+    // Save session to history
+    if (total_sessions < MAX_SESSIONS){
+        memcpy(&session_history[total_sessions], &current_session, sizeof(session_info_t));
+        total_sessions++;
+    }
+    
+
+    char *json_str = serialize_sessions_to_json();
+    if(json_str){
+        STORE_JSON_BODY_TO_NVS(NVS_NAMESPACE, "sessions_len", NVS_KEY_SESSIONS,strlen(json_str), json_str, NULL);
+        free(json_str);
+    }
+    
+    ESP_LOGI(TAG, "Session stopped: Present=%d, Absent=%d",current_session.total_present, current_session.total_absent);
+    
+    return ESP_OK;
+}
+
 /* ==================== SESSION STOP HANDLER ==================== */
 
 esp_err_t api_session_stop_handler(httpd_req_t *req) {
+   
     ESP_LOGI(TAG, "POST /api/session/stop");
-    
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_type(req, "application/json");
     
@@ -8253,7 +8301,7 @@ esp_err_t api_session_stop_handler(httpd_req_t *req) {
     // Response
     cJSON *response = cJSON_CreateObject();
     cJSON_AddBoolToObject(response, "success", err == ESP_OK);
-    if (err == ESP_OK) {
+    if (err == ESP_OK){
         cJSON_AddNumberToObject(response, "total_present", current_session.total_present);
         cJSON_AddNumberToObject(response, "total_absent", current_session.total_absent);
     }
@@ -8267,9 +8315,13 @@ esp_err_t api_session_stop_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+
+
+
 /* ==================== ATTENDANCE REPORT HANDLER ==================== */
 
-esp_err_t api_attendance_report_handler(httpd_req_t *req) {
+esp_err_t api_attendance_report_handler(httpd_req_t *req){
+   
     ESP_LOGI(TAG, "GET /api/attendance/report");
     
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -8377,7 +8429,7 @@ void rfid_scan_task(void *pvParameters) {
     time_t last_scan_time = 0;
     
     while (1) {
-       /* if (system_ready && current_session.active) {
+        if (system_ready && current_session.active) {
             bool card_present = false;
             rc522_is_card_present(rfid_handle, &card_present);
             
@@ -8394,170 +8446,380 @@ void rfid_scan_task(void *pvParameters) {
                         last_scan_time = now;
                         
                         lcd_show_scanning();
-                        
-                        int user_idx = find_user_by_rfid(&uid);
+                        int user_idx=0;
+                     //   int user_idx = find_user_by_rfid(&uid);
                         if (user_idx >= 0) {
                             user_record_t *user = &user_database[user_idx];
                             
-                            if (mark_attendance(user->user_id, AUTH_METHOD_RFID)) {
+                            if(attendance_mark(user->user_id,ATTENDANCE_PRESENT, AUTH_METHOD_RFID)) {
                                 lcd_show_user(user, ATTENDANCE_PRESENT);
                                 buzzer_play_pattern(BUZZER_PATTERN_SUCCESS);
-                                
-                                ESP_LOGI(TAG, "✓ ACCESS GRANTED - %s (RFID)", 
-                                         user->name);
-                            } else {
+                                ESP_LOGI(TAG, "✓ ACCESS GRANTED - %s (RFID)", user->name);
+                           
+                            }else{
                                 lcd_show_error("Already marked");
                                 buzzer_play_pattern(BUZZER_PATTERN_ERROR);
                             }
-                        } else {
+                            
+                        }else{
                             lcd_show_error("Card not found");
                             buzzer_play_pattern(BUZZER_PATTERN_ERROR);
                             system_stats.failed_scans++;
-                        }
+                          }
                         
                         vTaskDelay(pdMS_TO_TICKS(3000));
-                        lcd_show_ready();
+                      //  lcd_show_ready();
                     }
                 }
             }
-        }*/
+        }
         
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
-int current_user_count =0;
-static int find_next_free_id(void){
-	
-	ESP_LOGW(TAG, "current_user_count = %d ",current_user_count);
-    for (int i = 0; i < R305_MAX_TEMPLATES; i++){
-        if (!user_database[i].fingerprint_enrolled) {// && i == current_user_count + 1
-            return i;
-        }
-    }
-    return -1;  // Database full
-}
-/* ==================== FINGERPRINT SCAN TASK ==================== */
-static void enroll_new_user(void) {
+
   
-    if (!system_ready) {
-        ESP_LOGE(TAG, "System not ready");
-        return;
+
+void IDLE_DISPLAY_PRINT_task(void *pvParameters) {
+	
+	
+	  // Main loop
+    while (1) {
+        if (system_status.IDLE_DISPLAY_PRINT && system_status.lcd_ready ){
+	
+			 vTaskDelay(pdMS_TO_TICKS(2000));
+        if (system_ready && !current_session.active){
+             lcd_show_stats();
+             vTaskDelay(pdMS_TO_TICKS(3000));
+            lcd_show_device();
+        }else if (system_ready && current_session.active){
+			 lcd_show_ready();
+		}
+		
+		}
+		
+		 vTaskDelay(pdMS_TO_TICKS(2000));
     }
     
-    // Find next available ID
-    int template_id = find_next_free_id();
-    if (template_id < 0) {
-        ESP_LOGE(TAG, "Database full! Cannot enroll more users.");
-        return;
-    }
     
-    // Get username (in production, get from user input)
-    char username[MAX_NAME_LEN];
-    snprintf(username, sizeof(username), "User_%d", template_id);
-    
-    ESP_LOGI(TAG, "\n");
-   // ESP_LOGI(TAG, "====================================");
-    ESP_LOGI(TAG, "     NEW USER ENROLLMENT.....       ");
-   // ESP_LOGI(TAG, "====================================");
-    ESP_LOGI(TAG, " Template ID: %-5d                  ", template_id);
-    ESP_LOGI(TAG, " Username:    %-20s                 ", username);
-   // ESP_LOGI(TAG, "====================================");
-    
-    // Start enrollment
-    r305_status_t status = r305_enroll_finger(fp_handle, template_id, 10000);
-    if (status == R305_STATUS_OK) {
-      
-        
-        ESP_LOGI(TAG, "\n");
-        ESP_LOGI(TAG, "====================================");
-        ESP_LOGI(TAG, "   ✓ ENROLLMENT SUCCESSFUL!         ");
-        ESP_LOGI(TAG, "====================================");
-        ESP_LOGI(TAG, " User '%s' enrolled                 ", username);
-        ESP_LOGI(TAG, " Template ID: %d                    ", template_id);
-        ESP_LOGI(TAG, " Total users: %d                    ", current_user_count);
-        ESP_LOGI(TAG, "====================================");
-    } else {
-        ESP_LOGE(TAG, "\n");
-        ESP_LOGE(TAG, "====================================");
-        ESP_LOGE(TAG, "   ✗ ENROLLMENT FAILED              ");
-        ESP_LOGE(TAG, "====================================");
-        ESP_LOGE(TAG, " Error: %-27s                       ", r305_status_to_string(status));
-        ESP_LOGE(TAG, "====================================");
-    }
 }
+
 
 void fingerprint_scan_task(void *pvParameters) {
     
     while (1) {
 		
-        if (system_ready && current_session.active){
+        if (system_ready && current_session.active && system_status.fingerprint_ready){
             r305_search_result_t result;
-            r305_status_t status = r305_search_finger(fp_handle, &result, 5000);
+            r305_status_t status = r305_search_finger(fp_handle, &result, 3000);
             if (status != R305_STATUS_TIMEOUT) {
-                // Event handler takes care of feedback
-                vTaskDelay(pdMS_TO_TICKS(1000));
+                vTaskDelay(pdMS_TO_TICKS(500)); // Event handler takes care of feedback
             }
-        } else {
+        }else{
             vTaskDelay(pdMS_TO_TICKS(1000));
-        }
+            }
+            
+    } //while 
+}
+
+ esp_err_t fingerprint_delete_template_id(uint16_t template_id) {
+   
+    if (!system_ready && system_status.fingerprint_ready){
+        ESP_LOGE(TAG, "System not ready");
+        return ESP_FAIL;
     }
+    
+    
+    r305_status_t status = r305_delete_template(fp_handle, template_id);
+    if (status == R305_STATUS_OK) {
+		
+   
+        ESP_LOGI(TAG, "template_id User deleted successfully : %d",template_id);
+    } else {
+        ESP_LOGE(TAG, "Failed to delete user: %s", r305_status_to_string(status));
+         return ESP_FAIL;
+    }
+    
+     return ESP_OK;
 }
 
 
-void fingerprint_event_handler(r305_event_t *event, void *user_data) {
+ esp_err_t fingerprint_clear_all_LIBRARY(void){
     
-    switch (event->type) {
+    if (!system_ready && system_status.fingerprint_ready){
+        ESP_LOGE(TAG, "System not ready");
+        return ESP_FAIL;
+    }
+    
+    ESP_LOGW(TAG, "=====Clearing entire FINGERPRINT database=======");
+    r305_status_t status = r305_clear_database(fp_handle);
+    if(status == R305_STATUS_OK){
+        CURRENT_R305_TEMPLATE_COUNT = 0;
+        
+        
+        ESP_LOGI(TAG, "FINGERPRINT Database cleared successfully");
+    }else{
+        ESP_LOGE(TAG, "FINGERPRINT Failed to clear database: %s", r305_status_to_string(status));
+         return ESP_FAIL;
+      }
       
-        /*case R305_EVENT_SEARCH_SUCCESS: {
-			
+     return ESP_OK;
+}
+
+esp_err_t nvs_delete_key(const char *key){
+	
+	
+	/*#define NVS_NAMESPACE "attendance"
+#define NVS_KEY_USERS "users"
+#define NVS_KEY_ATTENDANCE "attendance"
+#define NVS_KEY_SESSIONS "sessions"
+#define NVS_KEY_CONFIG "config"
+#define NVS_KEY_STATS "stats"*/
+
+    nvs_handle_t handle;
+    esp_err_t err;
+    
+    err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK){
+		 ESP_LOGE("nvs_delete_key", "DATABASE NVS FAILED OPEN KEY: %s",key);
+		return err;
+ 
+	} 
+    err = nvs_erase_key(handle, key);
+     if (err != ESP_OK) {
+	 ESP_LOGE("nvs_delete_key", "DATABASE NVS FAILED DELETE KEY: %s",key);
+      return err;}
+   
+   ESP_LOGI("nvs_delete_key", "DATABASE NVS SUCCESS DELETE KEY: %s",key);
+    nvs_commit(handle);
+    nvs_close(handle);
+    
+    return err;
+}
+
+esp_err_t api_reset_clear_database_handler(httpd_req_t *req){
+   
+    ESP_LOGI(TAG, "GET /api/system/reset");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_type(req, "application/json");
+    
+    esp_err_t err = fingerprint_clear_all_LIBRARY();
+   
+    vTaskDelay(pdMS_TO_TICKS(10)); 
+    nvs_delete_key(NVS_KEY_ATTENDANCE); 
+    vTaskDelay(pdMS_TO_TICKS(10)); 
+    nvs_delete_key(NVS_KEY_SESSIONS);
+    vTaskDelay(pdMS_TO_TICKS(10)); 
+    nvs_delete_key(NVS_KEY_CONFIG);
+    vTaskDelay(pdMS_TO_TICKS(10)); 
+    nvs_delete_key(NVS_KEY_STATS);
+    vTaskDelay(pdMS_TO_TICKS(10)); 
+    
+    attendance_save_to_nvs();
+    total_users = 0;
+    total_records = 0;
+    total_sessions = 0;
+    CURRENT_R305_TEMPLATE_COUNT =0;
+    
+    attendance_save_to_nvs();
+    // Response
+    cJSON *response = cJSON_CreateObject();
+    if (err == ESP_OK){
+            cJSON_AddBoolToObject(response, "success", true);
+    }else{   cJSON_AddBoolToObject(response, "success", false);}
+    
+    char *resp_str = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    httpd_resp_sendstr(req, resp_str);
+    free(resp_str);
+    
+    return ESP_OK;
+}
+
+esp_err_t api_clear_attendance_handler(httpd_req_t *req){
+   
+    ESP_LOGI(TAG, "GET /api/database/clear-attendance");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_type(req, "application/json");
+    
+    
+    esp_err_t err =  nvs_delete_key(NVS_KEY_ATTENDANCE); 
+    attendance_save_to_nvs();
+    // Response
+    cJSON *response = cJSON_CreateObject();
+    if (err == ESP_OK){
+            cJSON_AddBoolToObject(response, "success", true);
+    }else{   cJSON_AddBoolToObject(response, "success", false);}
+    
+    char *resp_str = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    httpd_resp_sendstr(req, resp_str);
+    free(resp_str);
+    
+    return ESP_OK;
+}
+
+
+
+esp_err_t api_fingerprint_clear_database_handler(httpd_req_t *req){
+   
+    ESP_LOGI(TAG, "GET /api/fingerprint/clear_database");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_type(req, "application/json");
+    
+    esp_err_t err = fingerprint_clear_all_LIBRARY();
+    
+    // Response
+    cJSON *response = cJSON_CreateObject();
+    if (err == ESP_OK){
+		
+		 for (int i = 0; i < total_users; i++){
+              user_database[i].fingerprint_enrolled = false; 
+              user_database[i].fingerprint_id = 0; 
+              }  attendance_save_to_nvs();
+       
+		
+            cJSON_AddBoolToObject(response, "success", true);
+    }else{   cJSON_AddBoolToObject(response, "success", false);}
+    
+    char *resp_str = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    httpd_resp_sendstr(req, resp_str);
+    free(resp_str);
+    
+    return ESP_OK;
+}
+
+
+void fingerprint_event_handler(r305_event_t *event, void *user_data){
+    
+    
+/*    typedef enum {
+    R305_EVENT_INITIALIZED,
+  /  R305_EVENT_FINGER_DETECTED,
+   / R305_EVENT_FINGER_REMOVED,
+    R305_EVENT_IMAGE_CAPTURED,
+  /  R305_EVENT_ENROLL_PROGRESS,
+   / R305_EVENT_ENROLL_SUCCESS,
+   / R305_EVENT_ENROLL_FAILED,
+  /  R305_EVENT_MATCH_SUCCESS,
+  /  R305_EVENT_MATCH_FAILED,
+  /  R305_EVENT_SEARCH_SUCCESS,
+  /  R305_EVENT_SEARCH_FAILED,
+    R305_EVENT_ERROR,
+} r305_event_type_t;*/
+
+    switch (event->type) {
+     
+      case R305_EVENT_FINGER_DETECTED:
+           lcd_show_message("FINGER_SEARCH..");
+            break;
+            
+        case R305_EVENT_SEARCH_SUCCESS: {
+			ESP_LOGI(TAG, "[EVENT]==========R305_EVENT_SEARCH_SUCCESS==============");
             r305_search_result_t *result = &event->data.search_result;
-            int user_idx = attendance_find_user_by_fingerprint(result->template_id);
-            if (user_idx >= 0) {
+            int user_idx = attendance_find_by_fingerprint(result->template_id);
+            if(result->found && user_idx >= 0){ 
                 user_record_t *user = &user_database[user_idx];
-                
-                if (mark_attendance(user->user_id, AUTH_METHOD_FINGERPRINT)) {
+                ESP_LOGI(TAG, "USER FOUND - %s (FP)======", user->name);
+             
+               attendance_status_t att_result_temp = attendance_mark(user->user_id,ATTENDANCE_PRESENT, AUTH_METHOD_FINGERPRINT);
+              
+                if( att_result_temp == ATTENDANCE_DONE){
                     lcd_show_user(user, ATTENDANCE_PRESENT);
                     //buzzer_play_pattern(BUZZER_PATTERN_SUCCESS);
-                    
-                    ESP_LOGI(TAG, "✓ ACCESS GRANTED - %s (FP)", user->name);
-                } else {
+                    ESP_LOGI(TAG, "=======ACCESS GRANTED USER PRESENT - %s (FP)===========", user->email);
+               
+                }else if(att_result_temp == ALREAY_MARKED){
+					
+					ESP_LOGE(TAG, "USER DATA Already marked (FP)");
                     lcd_show_error("Already marked");
                     //buzzer_play_pattern(BUZZER_PATTERN_ERROR);
-                       }
-           
-            }else{
-                lcd_show_error("USER NOT FOUND");
+                }else if(att_result_temp == SESSION_INACTIVE){
+                   ESP_LOGE(TAG, "SESSION_INACTIVE (FP)");
+                    lcd_show_error("SESSION_INACTIVE");
+                }else if(att_result_temp == MEMORY_FULL){
+					ESP_LOGE(TAG, " MEMORY_FULL (FP)");
+                    lcd_show_error("MEMORY_FULL");
+					 
+				}else if(att_result_temp == USER_NOT_FOUND){
+					ESP_LOGE(TAG, "USER DATA USER_NOT_FOUND (FP)");
+                    lcd_show_error("USER_NOT_FOUND");
+			    }
+
+   
+           }else{
+				
+				ESP_LOGE(TAG, "USER DATA N/A  (FP)");
+                lcd_show_error("USER DATA N/A");
                 //buzzer_play_pattern(BUZZER_PATTERN_ERROR);
-                system_stats.failed_scans++;
+               // system_stats.failed_scans++;
                  }
-            
-            vTaskDelay(pdMS_TO_TICKS(3000));
-            lcd_show_ready();
+         
             break;
-        }*/
+        }
         
-        case R305_EVENT_SEARCH_FAILED:
+        case R305_EVENT_MATCH_SUCCESS:
+         
+            break;
+            
+        case R305_EVENT_MATCH_FAILED:
+         
+            break;    
+            
+         case R305_EVENT_SEARCH_FAILED:
             lcd_show_error("NOT RECOGNIZED");
             //buzzer_play_pattern(BUZZER_PATTERN_ERROR);
             system_stats.failed_scans++;
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            lcd_show_ready();
-            break;
+            break;     
+            
             
         case R305_EVENT_ENROLL_PROGRESS: {
+			
             r305_enroll_progress_t *progress = &event->data.enroll_progress;
             int step = (progress->state <= R305_ENROLL_PROCESS_1) ? 1 : 2;
-            lcd_show_enrollment("User", step);
+            lcd_show_enrollment("user", step);
            // buzzer_play_pattern(BUZZER_PATTERN_ENROLL_STEP);
             break;
         }
+        
+        case R305_EVENT_FINGER_REMOVED: {
+            lcd_show_message("REMOVE_FINGER");
+           // buzzer_play_pattern(BUZZER_PATTERN_ENROLL_STEP);
+            break;
+        }
+        
+         case R305_EVENT_ENROLL_SUCCESS: {
+			 lcd_show_message("ENROLL_SUCCESS");
+			 CURRENT_R305_TEMPLATE_COUNT++;
+            //lcd_show_enrollment("REMOVE FINGER", 0);
+           // buzzer_play_pattern(BUZZER_PATTERN_ENROLL_STEP);
+            break;
+        }
+        
+         case R305_EVENT_ENROLL_FAILED: {
+			  lcd_show_error("ENROLL_FAILED");
+            //lcd_show_enrollment("REMOVE FINGER", 0);
+           // buzzer_play_pattern(BUZZER_PATTERN_ENROLL_STEP);
+            break;
+        }
+         case R305_EVENT_ERROR: {
+			  lcd_show_error("FP SENSOR ERROR");
+            //lcd_show_enrollment("REMOVE FINGER", 0);
+           // buzzer_play_pattern(BUZZER_PATTERN_ENROLL_STEP);
+            break;
+        }
+      
         
         default:
             break;
     }
 }
 
-static bool initialize_Fingerprint_system(void) {
+static bool initialize_Fingerprint_system(void){
 	
     // Configure driver
     r305_config_t config = {
@@ -8649,7 +8911,10 @@ bool Initialize_RFID(){
      return true;
 }
 
+/* ==================== INITIALIZATION ==================== */
+
 static esp_err_t init_attendance_database(void) {
+	
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "STEP 4: Initializing Attendance Database");
     ESP_LOGI(TAG, "========================================");
@@ -8660,18 +8925,26 @@ static esp_err_t init_attendance_database(void) {
         return ESP_FAIL;
     }
    
+      // Clear arrays
+    memset(user_database, 0, sizeof(user_database));
+    memset(attendance_records, 0, sizeof(attendance_records));
+    memset(session_history, 0, sizeof(session_history));
+    memset(&current_session, 0, sizeof(current_session));
+    memset(&system_stats, 0, sizeof(system_stats));
+    
+   
+  
     // Call main initialization from attendance_system_optimized.c
-    esp_err_t ret = attendance_system_init();
+    esp_err_t ret = attendance_load_from_nvs();
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "✓ Attendance database initialized successfully");
-        ESP_LOGI(TAG, "Database status:");
         ESP_LOGI(TAG, "  Total users: %d", total_users);
+        ESP_LOGI(TAG, "Memory usage: Users=%u bytes, Attendance=%u bytes", sizeof(user_database), sizeof(attendance_records));
         ESP_LOGI(TAG, "  Memory usage: ~%d KB", (sizeof(user_database) + sizeof(attendance_records)) / 1024);
         
         // If no users exist, add sample users for testing
         if (total_users == 0) {
             ESP_LOGW(TAG, "No users found in NVS, adding sample users...");
-            total_users = 1 ;
             // Sample Student
             user_record_t sample_user = {
                // .user_id = 0,
@@ -8719,14 +8992,14 @@ static esp_err_t init_attendance_database(void) {
         system_status.database_ready = false;
     }
     
-  /*  if (system_status.lcd_ready) {
-        lcd_show_stats("Database", system_status.database_ready);
-    }*/
+    if (system_status.lcd_ready) {
+       // lcd_show_stats("Database", system_status.database_ready);
+    }
     
     return ret;
 }
 
-bool initialize_attendance_system(void) {
+bool initialize_attendance_system(void){
   
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "  CLASSROOM ATTENDANCE SYSTEM");
@@ -8738,6 +9011,7 @@ bool initialize_attendance_system(void) {
     ESP_LOGI(TAG, "Initializing LCD...");
     LCD_INITILIZED();
     system_status.lcd_ready = true;
+    system_status.IDLE_DISPLAY_PRINT = true;
     lcd_show_welcome();
     
     // Initialize Buzzer
@@ -8759,13 +9033,11 @@ bool initialize_attendance_system(void) {
     //Initialize_RFID();
 
     
-   
-  
-   
+ 
     // Initialize statistics
     system_stats.system_start_time = time(NULL);
     
-    lcd_show_ready();
+
     //buzzer_play_pattern(BUZZER_PATTERN_SUCCESS);
 
     
@@ -8821,7 +9093,7 @@ void app_main(void){
 	
 	 init_nvs_flash();
         
-  //  nvs_flash_erase();
+  // nvs_flash_erase();
    // print_nvs_info();
    
   ESP_LOGI(TAG, "Starting Classroom Attendance System...");
@@ -8845,18 +9117,8 @@ void app_main(void){
     // Create scanning tasks
    // xTaskCreate(rfid_scan_task, "rfid_scan", 4096, NULL, 5, NULL);
     xTaskCreate(fingerprint_scan_task, "fp_scan", 4096, NULL, 5, NULL);
+    xTaskCreate(IDLE_DISPLAY_PRINT_task, "IDLE_DISPLAY_PRINT", 2096, NULL, 4, NULL);
     
-    // Main loop
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        // Periodic statistics update
-        if (system_ready && !current_session.active){
-             lcd_show_stats();
-            vTaskDelay(pdMS_TO_TICKS(3000));
-            lcd_show_device();
-        }else if (system_ready && current_session.active){
-			 lcd_show_ready();
-		}
-    }
+
 }
 

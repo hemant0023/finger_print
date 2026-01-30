@@ -39,7 +39,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Users/user/git/finger_print/build/bootloader/esp-idf/cmake_install.cmake")
+  include("G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader/esp-idf/cmake_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "C:/Users/user/git/finger_print/build/bootloader/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

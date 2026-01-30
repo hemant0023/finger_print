@@ -52,9 +52,18 @@ typedef enum {
 
 typedef enum {
     ATTENDANCE_PRESENT = 0,
-    ATTENDANCE_ABSENT = 1,
-    ATTENDANCE_LATE = 2,
-    ATTENDANCE_LEAVE = 3,
+    ATTENDANCE_ABSENT =  1,
+    ATTENDANCE_LATE =    2,
+    ATTENDANCE_LEAVE =    3,
+    USER_NOT_FOUND,
+    ATTENDANCE_DONE,
+    ATTENDANCE_FAILED,
+    SESSION_INACTIVE,
+    SESSION_ACTIVE,
+    ALREAY_MARKED,
+    MEMORY_FULL,
+    SYSTEM_ERROR
+   
 } attendance_status_t;
 
 /* ==================== AUTHENTICATION MODE ==================== */
@@ -103,27 +112,16 @@ typedef struct {
 } user_record_t;
 
 /**
- * @brief Attendance record structure
- */
-typedef struct {
-    uint32_t record_id;
-    uint16_t user_id;
-    time_t timestamp;
-    attendance_status_t status;
-    auth_method_t auth_method;
-    char session_id[MAX_SESSION_ID_LEN];
-} attendance_record_t;
-
-/**
  * @brief Session information
  */
 typedef struct {
+	
     char session_id[MAX_SESSION_ID_LEN];
     char subject_name[MAX_SUBJECT_LEN];
     char faculty_name[MAX_NAME_LEN];
     char department[MAX_DEPARTMENT_LEN];
     
-    bool active;
+    bool   active;
     time_t start_time;
     time_t end_time;
     
@@ -131,11 +129,29 @@ typedef struct {
     uint16_t total_absent;
 } session_info_t;
 
+/**
+ * @brief Attendance record structure
+ */
+ 
+typedef struct {
+	
+	 uint16_t user_id;
+     uint32_t record_id;
+    time_t timestamp;
+    attendance_status_t status;
+    auth_method_t auth_method;
+    char session_id[MAX_SESSION_ID_LEN];
+    
+} attendance_record_t;
+
+
+
 
 /**
  * @brief System statistics
  */
 typedef struct {
+	
     uint16_t total_users;
     uint16_t total_students;
     uint16_t total_faculty;

@@ -1121,7 +1121,7 @@ async function clearAttendanceRecords() {
     }
     
     try {
-        const result = await apiCall('/api/database/clear-attendance', 'POST');
+        const result = await apiCall('/api/database/clear-attendance', 'GET');
         
         if (result && result.success) {
             systemData.attendance = [];
@@ -1148,7 +1148,7 @@ async function resetSystem() {
     }
     
     try {
-        const result = await apiCall('/api/system/reset', 'POST');
+        const result = await apiCall('/api/system/reset', 'GET');
         
         if (result && result.success) {
             showToast('System reset complete. Restarting...', 'success');

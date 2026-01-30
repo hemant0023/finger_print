@@ -39,10 +39,10 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("C:/Users/user/git/finger_print/build/esp-idf/mbedtls/mbedtls/include/cmake_install.cmake")
-  include("C:/Users/user/git/finger_print/build/esp-idf/mbedtls/mbedtls/3rdparty/cmake_install.cmake")
-  include("C:/Users/user/git/finger_print/build/esp-idf/mbedtls/mbedtls/library/cmake_install.cmake")
-  include("C:/Users/user/git/finger_print/build/esp-idf/mbedtls/mbedtls/pkgconfig/cmake_install.cmake")
+  include("G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/esp-idf/mbedtls/mbedtls/include/cmake_install.cmake")
+  include("G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/esp-idf/mbedtls/mbedtls/3rdparty/cmake_install.cmake")
+  include("G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/esp-idf/mbedtls/mbedtls/library/cmake_install.cmake")
+  include("G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/esp-idf/mbedtls/mbedtls/pkgconfig/cmake_install.cmake")
 
 endif()
 

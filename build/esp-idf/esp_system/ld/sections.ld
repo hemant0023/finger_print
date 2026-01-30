@@ -1,6 +1,6 @@
 /* Automatically generated file; DO NOT EDIT */
 /* Espressif IoT Development Framework Linker Script */
-/* Generated from: C:\Users\user\git\finger_print\build\esp-idf\esp_system\ld\sections.ld.in */
+/* Generated from: G:\ESP_IDF_PROJECT_2\FINGER_PRINT_INDUSTRIAL_VER\build\esp-idf\esp_system\ld\sections.ld.in */
 
 /*
 

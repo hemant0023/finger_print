@@ -244,7 +244,7 @@ static r305_status_t execute_command(r305_handle_t *handle, uint8_t cmd, const u
     // Check ACK code
     r305_ack_code_t ack = get_ack_code(rx_packet);
     if(ack != R305_OK){
-        ESP_LOGW(TAG, "Command 0x%02X failed: %s (0x%02X)", cmd, r305_ack_to_string(ack), ack);
+       // ESP_LOGI(TAG, "Command 0x%02X failed: %s (0x%02X)", cmd, r305_ack_to_string(ack), ack);
         
         // Map ACK code to status
         switch (ack) {
@@ -272,7 +272,7 @@ static r305_status_t execute_command(r305_handle_t *handle, uint8_t cmd, const u
 static r305_status_t capture_image(r305_handle_t *handle){
  
  
-    ESP_LOGI(TAG, "Capturing fingerprint image...");
+   // ESP_LOGI(TAG, "Capturing fingerprint image...");
     return execute_command(handle, R305_CMD_GEN_IMAGE, NULL, 0, NULL, NULL,   R305_IMAGE_CAPTURE_MS);
 }
 
@@ -346,7 +346,7 @@ static r305_status_t search_library(r305_handle_t *handle, uint8_t buffer_id,uin
         result->template_id = (response[10] << 8) | response[11];
         result->confidence = (response[12] << 8) | response[13];
         
-        ESP_LOGI(TAG, "Match found: ID=%d, Confidence=%d", result->template_id, result->confidence);
+       // ESP_LOGI(TAG, "Match found: ID=%d, Confidence=%d", result->template_id, result->confidence);
         
     } else if (status == R305_STATUS_NOT_FOUND && result){
         result->found = false;
@@ -396,7 +396,7 @@ static r305_status_t wait_for_finger_internal(r305_handle_t *handle,  uint32_t t
     uint32_t start_time = xTaskGetTickCount();
     uint32_t elapsed_ms = 0;
     
-    ESP_LOGI(TAG, "Waiting for finger placement...");
+  //  ESP_LOGI(TAG, "Waiting for finger placement...");
     
     while (elapsed_ms < timeout_ms) {
 		
@@ -409,7 +409,7 @@ static r305_status_t wait_for_finger_internal(r305_handle_t *handle,  uint32_t t
         }
         
         if (status != R305_STATUS_NO_FINGER){
-             ESP_LOGI(TAG, "Finger not detected....");
+           //  ESP_LOGI(TAG, "Finger not detected....");
             return status;
         }
         
@@ -829,22 +829,22 @@ r305_status_t r305_enroll_finger(r305_handle_t *handle, uint16_t template_id, ui
 }
 
 r305_status_t r305_search_finger(r305_handle_t *handle, r305_search_result_t *result, uint32_t timeout_ms) {
+  
     if (!handle || !handle->initialized || !result) {
         return R305_STATUS_INVALID_PARAM;
     }
     
-    ESP_LOGI(TAG, "========== FINGERPRINT SEARCH ==========");
+    ESP_LOGI(TAG, "========== FINGERPRINT SEARCH Place finger on sensor... ==========");
     
     xSemaphoreTake(handle->mutex, portMAX_DELAY);
     handle->state = R305_STATE_SEARCHING;
     
     uint32_t search_timeout = (timeout_ms > 0) ? timeout_ms : R305_SEARCH_TIMEOUT_MS;
     
-    // Wait for finger
-    ESP_LOGI(TAG, "Place finger on sensor...");
+   
     r305_status_t status = wait_for_finger_internal(handle, search_timeout);
     if (status != R305_STATUS_OK) {
-        ESP_LOGE(TAG, "No finger detected");
+        ESP_LOGW(TAG, "No finger detected AFTER search_timeout");
         handle->state = R305_STATE_IDLE;
         xSemaphoreGive(handle->mutex);
         return status;
@@ -861,19 +861,20 @@ r305_status_t r305_search_finger(r305_handle_t *handle, r305_search_result_t *re
     
     // Search library
     status = search_library(handle, R305_BUFFER_1, 0, R305_MAX_TEMPLATES, result);
-    
     if (status == R305_STATUS_OK) {
-        ESP_LOGI(TAG, "========== MATCH FOUND ==========");
+       
+        ESP_LOGI(TAG, "========== MATCH FOUND ==========: %d",result->found);
         ESP_LOGI(TAG, "Template ID: %d", result->template_id);
         ESP_LOGI(TAG, "Confidence: %d (%s)", result->confidence, r305_confidence_to_string(result->confidence));
         
         r305_event_t event = {
             .type = R305_EVENT_SEARCH_SUCCESS,
-            .data.search_result = *result
+            .data.search_result = *result,
+           // .data.template_id = result->template_id
         };
         fire_event(handle, &event);
     } else {
-        ESP_LOGI(TAG, "========== NO MATCH FOUND ==========");
+       // ESP_LOGI(TAG, "========== NO MATCH FOUND ==========");
         
         r305_event_t event = {
             .type = R305_EVENT_SEARCH_FAILED,
