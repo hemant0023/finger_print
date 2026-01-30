@@ -1,4 +1,4 @@
-# Install script for directory: G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/main
+# Install script for directory: C:/Users/user/git/finger_print/main
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

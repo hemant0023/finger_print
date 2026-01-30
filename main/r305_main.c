@@ -22,7 +22,8 @@ static r305_handle_t *fp_handle = NULL;
 static uint16_t current_user_count = 0;
 static bool system_ready = false;
 
-/* ==================== USER MANAGEMENT ==================== */
+/* ===================
+= USER MANAGEMENT ==================== */
 
 #define MAX_USERNAME_LEN 32
 

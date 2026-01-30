@@ -5,18 +5,18 @@ cmake_minimum_required(VERSION 3.5)
 
 file(MAKE_DIRECTORY
   "C:/Espressif/frameworks/esp-idf-v5.3.1/components/bootloader/subproject"
-  "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader"
-  "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader-prefix"
-  "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader-prefix/tmp"
-  "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader-prefix/src/bootloader-stamp"
-  "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader-prefix/src"
-  "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader-prefix/src/bootloader-stamp"
+  "C:/Users/user/git/finger_print/build/bootloader"
+  "C:/Users/user/git/finger_print/build/bootloader-prefix"
+  "C:/Users/user/git/finger_print/build/bootloader-prefix/tmp"
+  "C:/Users/user/git/finger_print/build/bootloader-prefix/src/bootloader-stamp"
+  "C:/Users/user/git/finger_print/build/bootloader-prefix/src"
+  "C:/Users/user/git/finger_print/build/bootloader-prefix/src/bootloader-stamp"
 )
 
 set(configSubDirs )
 foreach(subDir IN LISTS configSubDirs)
-    file(MAKE_DIRECTORY "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
+    file(MAKE_DIRECTORY "C:/Users/user/git/finger_print/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
 endforeach()
 if(cfgdir)
-  file(MAKE_DIRECTORY "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
+  file(MAKE_DIRECTORY "C:/Users/user/git/finger_print/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
 endif()

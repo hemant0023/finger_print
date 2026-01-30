@@ -14373,10 +14373,7 @@
                                 "help": "ESP32 only supports GPIO0 to input the RMII clock.",
                                 "id": "ETH_RMII_CLK_IN_GPIO",
                                 "name": "ETH_RMII_CLK_IN_GPIO",
-                                "range": [
-                                    0,
-                                    0
-                                ],
+                                "range": null,
                                 "title": null,
                                 "type": "int"
                             },
@@ -14396,7 +14393,10 @@
                                 "help": "Set the GPIO number to output RMII Clock.",
                                 "id": "ETH_RMII_CLK_OUT_GPIO",
                                 "name": "ETH_RMII_CLK_OUT_GPIO",
-                                "range": null,
+                                "range": [
+                                    16,
+                                    17
+                                ],
                                 "title": "RMII clock GPIO number",
                                 "type": "int"
                             },
@@ -19932,7 +19932,10 @@
                         "help": "Maximum long filename length. Can be reduced to save RAM.",
                         "id": "FATFS_MAX_LFN",
                         "name": "FATFS_MAX_LFN",
-                        "range": null,
+                        "range": [
+                            12,
+                            255
+                        ],
                         "title": "Max long filename length",
                         "type": "int"
                     },
@@ -23047,10 +23050,7 @@
                                         "help": "RFC 4330 recommends a startup delay before sending the initial request.\nLWIP calculates this delay to a random number of milliseconds between 0 and this value.",
                                         "id": "LWIP_SNTP_MAXIMUM_STARTUP_DELAY",
                                         "name": "LWIP_SNTP_MAXIMUM_STARTUP_DELAY",
-                                        "range": [
-                                            100,
-                                            300000
-                                        ],
+                                        "range": null,
                                         "title": "Maximum startup delay (ms)",
                                         "type": "int"
                                     }

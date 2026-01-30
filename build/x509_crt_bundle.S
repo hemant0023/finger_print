@@ -1,4 +1,4 @@
-/* * Data converted from G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from C:/Users/user/git/finger_print/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 #if !defined (__APPLE__) && !defined (__linux__)

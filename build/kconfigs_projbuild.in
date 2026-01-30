@@ -3,4 +3,4 @@ source "C:/Espressif/frameworks/esp-idf-v5.3.1/components/esp_app_format/Kconfig
 source "C:/Espressif/frameworks/esp-idf-v5.3.1/components/esp_rom/Kconfig.projbuild"
 source "C:/Espressif/frameworks/esp-idf-v5.3.1/components/esptool_py/Kconfig.projbuild"
 source "C:/Espressif/frameworks/esp-idf-v5.3.1/components/partition_table/Kconfig.projbuild"
-source "G:/ESP_IDF_PROJECT_2/FINGER_PRINT_INDUSTRIAL_VER/main/Kconfig.projbuild"
+source "C:/Users/user/git/finger_print/main/Kconfig.projbuild"
