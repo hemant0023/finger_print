@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Serial Number Configuration</title>
+    <!-- <link rel="stylesheet" href="style.css" /> -->
+    <style>
+      /* Fonts */
+/* @import "https://fonts.googleapis.com/css?family=Quicksand"; */
+
+/* Colors */
+    :root {
+      --white: #FFF;
+      --light-gray: #FAFAFA;
+      --charcoal: #384047;
+      --gray: #e8eeef;
+      --blue-gray: #8a97a0;
+      --orange: #fb8900;
+      --dark-orange: #fb8900;
+    }
+
+    /* General Styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      background-color: var(--light-gray);
+    }
+
+    body {
+      font-family: 'Quicksand', sans-serif;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    h1 {
+      font-weight: 700;
+      color: var(--charcoal);
+      text-align: center;
+      line-height: 1.5em;
+      margin-bottom: 0.4em;
+      margin-top: 0.2em;
+    }
+
+    a {
+      font-size: 0.98em;
+      color: var(--blue-gray);
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: var(--orange);
+    }
+
+    /* Main Flexbox */
+    .container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 6%;
+      background-color: #ffffff;
+    }
+
+    /* Form Layout */
+    form {
+      background-color: var(--white);
+      padding: 3em 4em 3em;
+      border-radius: 8px;
+      max-width: 400px;
+      box-shadow: 0 10px 40px -14px rgba(0, 0, 0, 0.756);
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .form-content {
+      display: flex;
+      flex-direction: column;
+    }
+
+    input {
+      color: var(--charcoal);
+      background-color: var(--gray);
+      border: none;
+      border-radius: 4px;
+      padding: 1em;
+      margin-bottom: 1.2em;
+      width: 100%;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03) inset;
+    }
+
+    input:focus {
+      outline: none;
+    }
+
+    .button {
+      font-weight: 600;
+      text-align: center;
+      font-size: 19px;
+      color: var(--white);
+      background-color: var(--orange);
+      width: 100%;
+      border: none;
+      border-radius: 4px;
+      padding: 0.8em;
+      margin: 1em 0;
+      cursor: pointer;
+      transition: all 200ms ease-in-out;
+      box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .button:hover {
+      box-shadow: 0px 6px 10px rgba(0, 0, 0, 0.3);
+      transform: translateY(-4px);
+    }
+
+    .signup-message {
+      text-align: center;
+    }
+
+    #mac-address-status{
+      text-align: center;
+      padding-bottom: 9px;
+    }
+    .logo {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      height: 50px;
+    }
+    .serial-number-status{
+      color:"blue",
+    }
+    </style>
+  </head>
+  <body>
+    <img src="./SENSEWELL_LOGO.jpg" alt="Logo" class="logo" />
+
+    <div class="container">
+      <form id="serial-number-form" action="#" method="post">
+        <div class="form-content">
+          <span id="mac-address-status">Fetching MAC address...</span>
+          <span id="serial-number-status"></span>
+        </div>
+        <br />
+        <h2>SERIAL NUMBER CONFIGURATION</h2>
+        <br />
+        <div class="form-content">
+          <span id="error-display"></span>
+          <input
+            type="text"
+            id="serial-number"
+            name="serial-number"
+            placeholder="SERIAL NUMBER"
+            required
+          />
+        </div>
+        <button type="button" id="configure-button" class="button">
+          CONFIGURE
+        </button>
+      </form>
+    </div>
+
+    <script>
+      const configureButton = document.getElementById("configure-button");
+      const serialNumberInput = document.getElementById("serial-number");
+      const serialNumberStatus = document.getElementById("serial-number-status");
+      const macAddressStatus = document.getElementById("mac-address-status");
+      const errorDisplay = document.getElementById("error-display");
+
+      function validateInput(inputValue) {
+        const regex = /^(\d{2})(\d{2})(\d{2})-21(\d{6})$/;
+
+        const match = inputValue.match(regex);
+        if (!match) return false;
+
+        const day = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10);
+        const year = parseInt(match[3], 10);
+
+        if (month < 1 || month > 12) return false;
+
+        const daysInMonth = new Date(year + 2000, month, 0).getDate();
+        if (day < 1 || day > daysInMonth) return false;
+
+        return true;
+      }
+
+      async function fetchMacAddress() {
+        try {
+          const response = await fetch(
+            //"http://192.168.4.1/GET_MAC_SERIAL_NUMBER"
+            "/GET_MAC_SERIAL_NUMBER"
+
+          );
+          
+          if (!response.ok) {
+            throw new Error("Failed to fetch MAC address");
+          }
+
+          const data = await response.json();
+
+          if (data && data.ESP_INFORMATION && data.ESP_INFORMATION.MAC_ADDRESS) {
+            macAddressStatus.textContent = `MAC ADDRESS : ${data.ESP_INFORMATION.MAC_ADDRESS}`;
+            macAddressStatus.style.color = "green";
+          } else {
+            macAddressStatus.textContent = "MAC address not found";
+            macAddressStatus.style.color = "red";
+          }
+        } catch (error) {
+          macAddressStatus.textContent = "Error fetching MAC address";
+          macAddressStatus.style.color = "red";
+          console.error("Error fetching MAC address:", error);
+        }
+      }
+
+      async function configureSerialNumber() {
+        const serialNumber = serialNumberInput.value.trim();
+
+        if (!serialNumber || !validateInput(serialNumber)) {
+          errorDisplay.textContent = "Please enter a valid Serial Number";
+          errorDisplay.style.color = "red";
+          return;
+        }
+
+        errorDisplay.textContent = ""; // Clear any previous error messages
+
+        let payload = {
+          "ESP_INFORMATION":{
+            "SERIAL_NUMBER": serialNumber
+          }
+        }
+        console.log(payload);
+   
+
+        try {
+            // const response = await fetch("http://192.168.4.1/GET_MAC_SERIAL_NUMBER", {
+              const response = await fetch("/GET_MAC_SERIAL_NUMBER", {
+
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            });
+
+            
+            if (!response.ok) {
+              //Below this is the response message sent from the esp32 server
+              const res = await response.text()
+              serialNumberStatus.textContent = `${res}`;
+              serialNumberStatus.style.color = "red"
+              return;
+            }
+
+            const data = await response.text();
+            serialNumberStatus.textContent = `${data}`;
+            serialNumberStatus.style.color = "green";
+            console.log("Response data:", data);
+          } catch (error) {
+            serialNumberStatus.textContent =
+              "An error occurred while configuring the Serial Number.";
+            serialNumberStatus.style.color = "red";
+            console.error("Error:", error);
+          }
+
+      }
+          serialNumberStatus.style.color = "green"
+
+          serialNumberStatus.textContent = "";
+
+      configureButton.addEventListener("click", configureSerialNumber);
+
+      fetchMacAddress();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attendance System - Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="brand-icon">🎓</span>
+                <span class="brand-text">Smart Attendance</span>
+            </div>
+            <div class="nav-links">
+                <a href="#dashboard" class="nav-link active" data-page="dashboard">
+                    <span class="nav-icon">📊</span> Dashboard
+                </a>
+                <a href="#users" class="nav-link" data-page="users">
+                    <span class="nav-icon">👥</span> Users
+                </a>
+                <a href="#attendance" class="nav-link" data-page="attendance">
+                    <span class="nav-icon">📋</span> Attendance
+                </a>
+                <a href="#session" class="nav-link" data-page="session">
+                    <span class="nav-icon">🎯</span> Session
+                </a>
+                <a href="#settings" class="nav-link" data-page="settings">
+                    <span class="nav-icon">⚙️</span> Settings
+                </a>
+            </div>
+            <div class="nav-status">
+                <span id="systemStatus" class="status-indicator">●</span>
+                <span id="timeDisplay" class="time-display">00:00:00</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <div class="main-container">
+        
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page active">
+            <div class="page-header">
+                <h1>Dashboard</h1>
+                <p class="page-subtitle">Real-time attendance monitoring and statistics</p>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="stats-grid">
+                <div class="stat-card stat-primary">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalUsers">0</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-success">
+                    <div class="stat-icon">🎓</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalStudents">0</div>
+                        <div class="stat-label">Students</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-info">
+                    <div class="stat-icon">👨‍🏫</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalFaculty">0</div>
+                        <div class="stat-label">Faculty</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-warning">
+                    <div class="stat-icon">✓</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="todayPresent">0</div>
+                        <div class="stat-label">Present Today</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Session Status -->
+            <div class="content-card">
+                <div class="card-header">
+                    <h2>Current Session</h2>
+                    <button class="btn btn-sm btn-primary" onclick="refreshSession()">
+                        🔄 Refresh
+                    </button>
+                </div>
+                <div id="sessionStatus" class="session-status">
+                    <!-- Session content will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="content-card">
+                <div class="card-header">
+                    <h2>Recent Attendance</h2>
+                    <div class="header-actions">
+                        <select id="recentFilter" class="form-select" onchange="filterRecent()">
+                            <option value="all">All</option>
+                            <option value="student">Students</option>
+                            <option value="faculty">Faculty</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="recentTable">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Name</th>
+                                <th>Roll No/ID</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Method</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentTableBody">
+                            <!-- Recent attendance rows will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Page -->
+        <div id="users-page" class="page">
+            <div class="page-header">
+                <h1>User Management</h1>
+                <button class="btn btn-primary" onclick="showAddUserModal()">
+                    ➕ Add New User
+                </button>
+            </div>
+
+            <!-- Search and Filter -->
+            <div class="content-card">
+                <div class="search-bar">
+                    <input type="text" id="userSearch" class="form-input" 
+                           placeholder="🔍 Search by name, roll number, or email..." 
+                           oninput="searchUsers()">
+                    <div class="filter-group">
+                        <select id="userTypeFilter" class="form-select" onchange="filterUsers()">
+                            <option value="all">All Types</option>
+                            <option value="student">Students</option>
+                            <option value="faculty">Faculty</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <select id="departmentFilter" class="form-select" onchange="filterUsers()">
+                            <option value="all">All Departments</option>
+                        </select>
+                        <select id="statusFilter" class="form-select" onchange="filterUsers()">
+                            <option value="active">Active Only</option>
+                            <option value="all">All Status</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="content-card">
+                <div class="card-header">
+                    <h2>All Users</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="exportUsers()">
+                            📥 Export CSV
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="printUsers()">
+                            🖨️ Print
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Roll No/ID</th>
+                                <th>Department</th>
+                                <th>Email</th>
+                                <th>FP</th>
+                                <th>RFID</th>
+                                <th>Attendance</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <!-- User rows will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Page -->
+        <div id="attendance-page" class="page">
+            <div class="page-header">
+                <h1>Attendance Records</h1>
+                <button class="btn btn-primary" onclick="exportAttendance()">
+                    📥 Export Report
+                </button>
+            </div>
+
+            <!-- Date Range Filter -->
+            <div class="content-card">
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label>From Date:</label>
+                        <input type="date" id="dateFrom" class="form-input" onchange="filterAttendance()">
+                    </div>
+                    <div class="form-group">
+                        <label>To Date:</label>
+                        <input type="date" id="dateTo" class="form-input" onchange="filterAttendance()">
+                    </div>
+                    <div class="form-group">
+                        <label>Department:</label>
+                        <select id="attDepartmentFilter" class="form-select" onchange="filterAttendance()">
+                            <option value="all">All Departments</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status:</label>
+                        <select id="attStatusFilter" class="form-select" onchange="filterAttendance()">
+                            <option value="all">All Status</option>
+                            <option value="present">Present</option>
+                            <option value="late">Late</option>
+                            <option value="absent">Absent</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" onclick="resetAttendanceFilters()">
+                        🔄 Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Attendance Summary -->
+            <div class="stats-grid">
+                <div class="stat-card stat-success">
+                    <div class="stat-content">
+                        <div class="stat-value" id="attPresent">0</div>
+                        <div class="stat-label">Present</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-warning">
+                    <div class="stat-content">
+                        <div class="stat-value" id="attLate">0</div>
+                        <div class="stat-label">Late</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-danger">
+                    <div class="stat-content">
+                        <div class="stat-value" id="attAbsent">0</div>
+                        <div class="stat-label">Absent</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-info">
+                    <div class="stat-content">
+                        <div class="stat-value" id="attPercentage">0%</div>
+                        <div class="stat-label">Avg. Attendance</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Table -->
+            <div class="content-card">
+                <div class="table-container">
+                    <table class="data-table" id="attendanceTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Name</th>
+                                <th>Roll No</th>
+                                <th>Department</th>
+                                <th>Subject</th>
+                                <th>Status</th>
+                                <th>Method</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTableBody">
+                            <!-- Attendance rows will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Page -->
+        <div id="session-page" class="page">
+            <div class="page-header">
+                <h1>Session Management</h1>
+            </div>
+
+            <!-- Session Control -->
+            <div class="content-card">
+                <div id="sessionControl">
+                    <!-- Session control will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Session History -->
+            <div class="content-card">
+                <div class="card-header">
+                    <h2>Session History</h2>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Subject</th>
+                                <th>Faculty</th>
+                                <th>Duration</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessionHistoryBody">
+                            <!-- Session history will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="settings-page" class="page">
+            <div class="page-header">
+                <h1>System Settings</h1>
+            </div>
+
+            <!-- System Configuration -->
+            <div class="settings-grid">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h2>Classroom Information</h2>
+                    </div>
+                    <form id="classroomForm" class="form">
+                        <div class="form-group">
+                            <label>Classroom ID:</label>
+                            <input type="text" id="classroomId" class="form-input" value="CS-101">
+                        </div>
+                        <div class="form-group">
+                            <label>Classroom Name:</label>
+                            <input type="text" id="classroomName" class="form-input" value="Computer Lab">
+                        </div>
+                        <div class="form-group">
+                            <label>Department:</label>
+                            <input type="text" id="settingsDepartment" class="form-input" value="Computer Science">
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="saveClassroomSettings()">
+                            💾 Save Settings
+                        </button>
+                    </form>
+                </div>
+
+                <div class="content-card">
+                    <div class="card-header">
+                        <h2>Authentication Settings</h2>
+                    </div>
+                    <form id="authForm" class="form">
+                        <div class="form-group">
+                            <label>Authentication Mode:</label>
+                            <select id="authMode" class="form-select">
+                                <option value="both">Both (Fingerprint + RFID)</option>
+                                <option value="fingerprint">Fingerprint Only</option>
+                                <option value="rfid">RFID Only</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="enableFingerprint" checked>
+                                Enable Fingerprint Scanner
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="enableRFID" checked>
+                                Enable RFID Reader
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="enableBuzzer" checked>
+                                Enable Buzzer Feedback
+                            </label>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="saveAuthSettings()">
+                            💾 Save Settings
+                        </button>
+                    </form>
+                </div>
+
+                <div class="content-card">
+                    <div class="card-header">
+                        <h2>Attendance Rules</h2>
+                    </div>
+                    <form id="rulesForm" class="form">
+                        <div class="form-group">
+                            <label>Late Threshold (minutes):</label>
+                            <input type="number" id="lateThreshold" class="form-input" value="15">
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="allowMultipleEntry">
+                                Allow Multiple Entries per Day
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="autoMarkAbsent" checked>
+                                Auto Mark Absent After Session
+                            </label>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="saveRulesSettings()">
+                            💾 Save Settings
+                        </button>
+                    </form>
+                </div>
+
+                <div class="content-card">
+                    <div class="card-header">
+                        <h2>Database Management</h2>
+                    </div>
+                    <div class="form">
+                        <button class="btn btn-secondary btn-full" onclick="backupDatabase()">
+                            💾 Backup Database
+                        </button>
+                        <button class="btn btn-secondary btn-full" onclick="restoreDatabase()">
+                            📥 Restore Database
+                        </button>
+                        <button class="btn btn-warning btn-full" onclick="clearAttendanceRecords()">
+                            🗑️ Clear Attendance Records
+                        </button>
+                        <button class="btn btn-danger btn-full" onclick="resetSystem()">
+                            ⚠️ Reset System
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add/Edit User -->
+    <div id="userModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="userModalTitle">Add New User</h2>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <form id="userForm" class="form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Full Name: *</label>
+                        <input type="text" id="userName" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>User Type: *</label>
+                        <select id="userType" class="form-select" onchange="toggleStudentFields()" required>
+                            <option value="student">Student</option>
+                            <option value="faculty">Faculty</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" id="rollNumberGroup">
+                        <label>Roll Number: *</label>
+                        <input type="text" id="userRollNumber" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="userEmail" class="form-input">
+                    </div>
+                </div>
+                <div class="form-row" id="studentFields">
+                    <div class="form-group">
+                        <label>Department: *</label>
+                        <select id="userDepartment" class="form-select">
+                            <option value="">Select Department</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Information Technology">Information Technology</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Mechanical">Mechanical</option>
+                            <option value="Civil">Civil</option>
+                            <option value="Electrical">Electrical</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Semester:</label>
+                        <select id="userSemester" class="form-select">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status:</label>
+                        <select id="userStatus" class="form-select">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="suspended">Suspended</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="enrollment-section">
+                    <h3>Biometric Enrollment</h3>
+                    <div class="enrollment-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="enrollFingerprint()">
+                            🖐️ Enroll Fingerprint
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="enrollRFID()">
+                            💳 Register RFID Card
+                        </button>
+                    </div>
+                    <div class="enrollment-status">
+                        <div class="status-item">
+                            <span>Fingerprint:</span>
+                            <span id="fpStatus" class="badge badge-danger">Not Enrolled</span>
+                        </div>
+                        <div class="status-item">
+                            <span>RFID Card:</span>
+                            <span id="rfidStatus" class="badge badge-danger">Not Registered</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Session Control -->
+    <div id="sessionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Start New Session</h2>
+                <button class="modal-close" onclick="closeSessionModal()">&times;</button>
+            </div>
+            <form id="sessionForm" class="form">
+                <div class="form-group">
+                    <label>Subject Name: *</label>
+                    <input type="text" id="sessionSubject" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Faculty Name: *</label>
+                    <input type="text" id="sessionFaculty" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Department:</label>
+                    <select id="sessionDepartment" class="form-select">
+                        <option value="all">All Departments</option>
+                        <option value="Computer Science">Computer Science</option>
+                        <option value="Information Technology">Information Technology</option>
+                        <option value="Electronics">Electronics</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeSessionModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Start Session</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- JavaScript -->
+    <script src="/script.js"></script>
+</body>
+</html>
